@@ -1,0 +1,304 @@
+type: edu
+custom_name: stage2
+files:
+- name: build.gradle
+  visible: true
+  text: |-
+    apply plugin: 'java'
+    apply plugin: 'application'
+
+    group 'advisor'
+    version '1.0-SNAPSHOT'
+
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        implementation 'com.google.code.gson:gson:+'
+    }
+
+    jar {
+        manifest {
+            attributes 'Main-Class' : 'advisor.Main'
+        }
+        from {
+            configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+        }
+    }
+  learner_created: false
+- name: src/advisor/Main.java
+  visible: true
+  text: |
+    package advisor;
+
+    public class Main {
+        public static void main(String[] args) {
+            System.out.println("Hello World!");
+        }
+    }
+  learner_created: false
+- name: test/MusicAdvisorTest.java
+  visible: false
+  text: |
+    import org.hyperskill.hstest.stage.StageTest;
+    import org.hyperskill.hstest.testcase.CheckResult;
+    import org.hyperskill.hstest.testcase.TestCase;
+
+    import java.util.List;
+    import java.util.function.Function;
+
+    class Attach {
+        Function<String, CheckResult> func;
+
+        Attach(Function<String, CheckResult> func) {
+            this.func = func;
+        }
+    }
+
+    public class MusicAdvisorTest extends StageTest<Attach> {
+
+        @Override
+        public List<TestCase<Attach>> generate() {
+            return List.of(
+                new TestCase<Attach>()
+                    .setInput("auth\nexit")
+                    .setAttach(new Attach(reply -> {
+                        if (!reply.contains("---SUCCESS---")) {
+                            return new CheckResult(false,
+                                "There is no \"---SUCCESS---\" after \"auth\" but should be");
+                        }
+                        if (!reply.contains("https://accounts.spotify.com/authorize?")) {
+                            return new CheckResult(false,
+                                "There is no link after \"auth\" but should be");
+                        }
+                        if (reply.contains("a19ee7dbfda443b2a8150c9101bfd645")) {
+                            return new CheckResult(false,
+                                    "You shouldn't use the client_id from the example!! " +
+                                            "You should create your own id on the spotify site.");
+                        }
+                        return CheckResult.correct();
+                    })),
+
+                new TestCase<Attach>()
+                    .setInput("new\nexit")
+                    .setAttach(new Attach(reply -> {
+                        if (!reply.strip().startsWith("Please, provide access for application.")) {
+                            return new CheckResult(false,
+                                "When no access provided you should output " +
+                                    "\"Please, provide access for application.\"");
+                        }
+                        return CheckResult.correct();
+                    })),
+
+                new TestCase<Attach>()
+                    .setInput("featured\nexit")
+                    .setAttach(new Attach(reply -> {
+                        if (!reply.strip().startsWith("Please, provide access for application.")) {
+                            return new CheckResult(false,
+                                "When no access provided you should output " +
+                                    "\"Please, provide access for application.\"");
+                        }
+                        return CheckResult.correct();
+                    })),
+
+                new TestCase<Attach>()
+                    .setInput("auth\nnew\nfeatured\nexit")
+                    .setAttach(new Attach(reply -> {
+                        if (!reply.contains("---NEW RELEASES---")) {
+                            return new CheckResult(false,
+                                "When \"new\" was inputted there should be \"---NEW RELEASES---\" line");
+                        }
+                        if (!reply.contains("---FEATURED---")) {
+                            return new CheckResult(false,
+                                "When \"featured\" was inputted there should be \"---FEATURED---\" line");
+                        }
+                        return CheckResult.correct();
+                    }))
+
+            );
+        }
+
+        @Override
+        public CheckResult check(String reply, Attach clue) {
+            return clue.func.apply(reply);
+        }
+    }
+  learner_created: false
+- name: src/advisor/Menu.java
+  visible: true
+  text: |
+    package advisor;
+
+    public class Menu {
+        public void printMenu(String option) {
+            switch (option) {
+                case "new" :
+                    optionNew();
+                    break;
+                case "featured":
+                    optionFeature();
+                    break;
+                case "playlists":
+                    optionPlaylists();
+                    break;
+                case "categories" :
+                    optionCategories();
+                    break;
+
+            }
+        }
+
+        private static void optionNew() {
+
+            System.out.println("---NEW RELEASES---\n" +
+                    "Mountains [Sia, Diplo, Labrinth]\n" +
+                    "Runaway [Lil Peep]\n" +
+                    "The Greatest Show [Panic! At The Disco]\n" +
+                    "All Out Life [Slipknot]");
+
+        }
+
+        private static void optionFeature() {
+
+              System.out.println("---FEATURED---\n" +
+                    "Mellow Morning\n" +
+                    "Wake Up and Smell the Coffee\n" +
+                    "Monday Motivation\n" +
+                    "Songs to Sing in the Shower");
+
+        }
+
+        private static void optionCategories() {
+
+            System.out.println("---CATEGORIES---\n" +
+                    "Top Lists\n" +
+                    "Pop\n" +
+                    "Mood\n" +
+                    "Latin");
+
+
+        }
+
+        private static void optionPlaylists() {
+
+            System.out.println("---MOOD PLAYLISTS---\n" +
+                    "Walk Like A Badass  \n" +
+                    "Rage Beats  \n" +
+                    "Arab Mood Booster  \n" +
+                    "Sunday Stroll");
+
+        }
+
+    }
+  learner_created: true
+- name: src/advisor/Authorization.java
+  visible: true
+  text: |
+    package advisor;
+
+    import com.sun.net.httpserver.HttpServer;
+
+    import java.io.IOException;
+    import java.net.InetSocketAddress;
+    import java.net.URI;
+    import java.net.http.HttpClient;
+    import java.net.http.HttpRequest;
+    import java.net.http.HttpResponse;
+    import java.nio.charset.StandardCharsets;
+
+
+    public class Authorization {
+        final String CLIENT_ID = "5588f3755e33431ebd4ff0b7e9fdbfe8";
+        final String CLIENT_SECRET = "2a8631c9f268488babf950a813473fd5";
+        final String REDIRECT_URI = "http://localhost:8080";
+        final String GRANT_TYPE = "authorization_code";
+        final String RESPONSE_TYPE = "code";
+
+        String authorizationCode = null;
+        String accessPoint;
+
+        public Authorization (String accessPoint) {
+            this.accessPoint = accessPoint;
+        }
+
+        public void authorize() throws IOException, InterruptedException {
+            requestUserAuthorization();
+            if (authorizationCode.length() > 0) {
+                requestAccessToken();
+            }
+        }
+
+        private void requestAccessToken() throws IOException, InterruptedException {
+
+            HttpClient client = HttpClient.newBuilder().build();
+
+
+            // the body of the POST request
+            String requestBody = "grant_type=" + GRANT_TYPE +
+                                "&client_id=" + CLIENT_ID +
+                    "&client_secret=" + CLIENT_SECRET +
+                    "&code=" + authorizationCode +
+                    "&redirect_uri=" + REDIRECT_URI;
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .uri(URI.create(accessPoint + "/api/token"))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            System.out.println("response:");
+            System.out.println(response.body());
+            System.out.println("---SUCCESS---");
+            Main.authorized = true;
+        }
+
+        private void requestUserAuthorization() throws IOException, InterruptedException {
+            // create a link for user to request the accesse code
+            String link = accessPoint + "/authorize?" +
+                    "client_id=" + CLIENT_ID +
+                    "&response_type=" + RESPONSE_TYPE +
+                    "&redirect_uri=" + REDIRECT_URI;
+
+            System.out.println("use this link to request the access code:");
+            System.out.println(link);
+
+            HttpServer server = HttpServer.create();
+            server.bind(new InetSocketAddress(8080), 0);
+            server.createContext("/",
+                    exchange -> {
+                        String query = exchange.getRequestURI().getQuery();
+                        String browserMessage;
+                        if (query != null && query.startsWith("code")) {
+                            browserMessage = "Got the code. Return back to your program.";
+                            System.out.println("code received"); // print to the console
+                            authorizationCode = query.substring(5);
+                        } else {
+                            authorizationCode = "";
+                            browserMessage = "Authorization code not found. Try again.";
+                        }
+
+                        exchange.sendResponseHeaders(200, browserMessage.length());
+                        exchange.getResponseBody().write(browserMessage.getBytes(StandardCharsets.UTF_8));
+                        exchange.close();
+
+                    });
+
+
+            server.start();
+            while (authorizationCode == null) {
+                Thread.sleep(100);
+            }
+            server.stop(1);
+        }
+
+
+    }
+  learner_created: true
+feedback_link: https://hyperskill.org/learn/step/5478#comment
+status: Solved
+feedback:
+  message: Congratulations!
+  time: Sun, 06 Mar 2022 08:59:36 UTC
+record: 2
